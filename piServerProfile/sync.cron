@@ -1,0 +1,3 @@
+# Sync
+*/10 * * * * /home/pi/piServerProfile/sync.sh
+
