@@ -1,3 +1,8 @@
-# Sync
-*/10 * * * * /home/pi/piServerProfile/sync.sh
+#PiServer Sync
 
+*/1 * * * * /root/motion_watch.sh
+
+0 1 * * * /bin/sh -c "echo 1 > /tmp/isMotionToRun.conf"
+0 7 * * * /bin/sh -c "echo 0 > /tmp/isMotionToRun.conf"
+30 8 * * * /bin/sh -c "echo 1 > /tmp/isMotionToRun.conf"
+0 18 * * * /bin/sh -c "echo 0 > /tmp/isMotionToRun.conf"

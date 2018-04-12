@@ -1,0 +1,4 @@
+#Default cron jobs
+
+*/1 * * * * /root/tunnel.sh
+

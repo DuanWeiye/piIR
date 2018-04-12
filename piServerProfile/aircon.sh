@@ -17,5 +17,5 @@ fi
 
 
 irsend SEND_ONCE room air_off
-sleep 3
-irsend SEND_ONCE room air_on_hot_28c
+sleep 5
+irsend SEND_ONCE room air_on_hot_29c

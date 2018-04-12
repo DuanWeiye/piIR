@@ -56,19 +56,23 @@ int GetServiceStatus();
 int ExecuteCMD(char* inputLine, char* outputLine, int outputLength);
 void PrintScreen(int x, int y, int type, char* color, char* inputText);
 void Trim(char* inputBuffer, int bufferSize);
+void SaveSettings();
 
 static int exitFlag = 0;
 static int bklFlag = 1;
 static int pushFlag = 0;
 
 static int arrowPos = 0;
+
 static int serviceStatus[3] = { FALSE, FALSE, FALSE };
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char* argv[])
 {
+	int ret = 0;
 	struct timeval delay;
+	char buffer[1024] = { 0 };
 	pthread_t threadLive, threadInput;
 
 	PrintMain();
@@ -95,7 +99,18 @@ int main(int argc, char* argv[])
 	pullUpDnControl (GPIO_L, PUD_UP);
 	pullUpDnControl (GPIO_R, PUD_UP);
 
-	digitalWrite(GPIO_BKL, 1);
+        memset((void *)buffer, (int)'\0', sizeof(buffer));
+        ret = ExecuteCMD("cat /home/pi/piServerProfile/config.conf | grep isBacklightOn | cut -d'=' -f 2", buffer, sizeof(buffer));
+        if (0 == ret || strlen(buffer) > 0)
+	{
+		bklFlag=atoi(buffer);
+	}
+	else
+	{
+		bklFlag=1;
+	}
+
+	digitalWrite(GPIO_BKL, bklFlag);
 
 	pthread_mutex_init (&mutex, NULL);
 
@@ -135,7 +150,6 @@ int main(int argc, char* argv[])
 void* ThreadInput(void* args)
 {
 	struct timeval delay;
-	bklFlag = 1;
 	pushFlag = 0;
 
 	while (0 == exitFlag)
@@ -206,6 +220,7 @@ void* ThreadInput(void* args)
 				}
 
                         	digitalWrite(GPIO_BKL, bklFlag);
+				SaveSettings();
        			}
 		}
 		else if (0 == digitalRead(GPIO_4))
@@ -281,7 +296,7 @@ void* ThreadLive(void* args)
 			PrintScreen(0, 6, PRINT_CENTER, CYAN, "ERROR");
 		}
 
-	        ret = ExecuteCMD("uptime | head -1 | awk -F, '{print $1}' | awk '{print $3}'", buffer, sizeof(buffer));
+	        ret = ExecuteCMD("uptime | head -1 | awk -F, '{print $1}' | cut -d' ' -f 4-", buffer, sizeof(buffer));
                 if (0 == ret)
                 {
                         PrintScreen(0, 9, PRINT_MID_L, CYAN, buffer);
@@ -364,7 +379,7 @@ void PrintMain()
 	//PrintScreen(0, 14, PRINT_CENTER, WHITE, "                                      ");
         PrintScreen(0, 15, PRINT_CENTER, WHITE, "======================================");
 
-        PrintScreen(10, MENU_ITEM_0, PRINT_NORMAL, WHITE, "[  ] Aircon Forced-On");
+        PrintScreen(10, MENU_ITEM_0, PRINT_NORMAL, WHITE, "[  ] Aircon Auto On");
 	PrintScreen(10, MENU_ITEM_1, PRINT_NORMAL, WHITE, "[  ] TV Auto On");
 	PrintScreen(10, MENU_ITEM_2, PRINT_NORMAL, WHITE, "[  ] Cloud Schedule Sync");
 
@@ -388,6 +403,18 @@ void PrintDialog()
 	PrintScreen(0, 0, PRINT_NORMAL, WHITE, "");
 
 	fflush(stdout);
+}
+
+void SaveSettings()
+{
+        char bufferCmd[1024] = { 0 };
+	char bufferText[1024] = { 0 };
+
+	memset((void *)bufferCmd, (int)'\0', sizeof(bufferCmd));
+	memset((void *)bufferText, (int)'\0', sizeof(bufferText));
+
+	sprintf(bufferText, "echo isBacklightOn=%d > /home/pi/piServerProfile/config.conf", bklFlag);
+        ExecuteCMD(bufferText, bufferCmd, sizeof(bufferCmd));
 }
 
 void PrintArrow()
@@ -430,19 +457,28 @@ int SwitchService()
 		serviceStatus[2] = (TRUE == serviceStatus[2]) ? FALSE : TRUE;
         }
 
-	ExecuteCMD("cat \"# piServer Auto Script\" >/tmp/crontab.cron", buffer, sizeof(buffer));
+	// Print title
+	ExecuteCMD("echo \"# piServer Auto Script\" >/tmp/crontab.cron", buffer, sizeof(buffer));
+	ExecuteCMD("echo >>/tmp/crontab.cron", buffer, sizeof(buffer));
+
+	// Add default cron jobs
+	ExecuteCMD("cat /home/pi/piServerProfile/default.cron >>/tmp/crontab.cron", buffer, sizeof(buffer));
+	ExecuteCMD("echo >>/tmp/crontab.cron", buffer, sizeof(buffer));
 
 	if (TRUE == serviceStatus[0])
 	{
 		ExecuteCMD("cat /home/pi/piServerProfile/aircon.cron >>/tmp/crontab.cron", buffer, sizeof(buffer));
+		ExecuteCMD("echo >>/tmp/crontab.cron", buffer, sizeof(buffer));
 	}
         if (TRUE == serviceStatus[1])
         {
                 ExecuteCMD("cat /home/pi/piServerProfile/tv.cron >>/tmp/crontab.cron", buffer, sizeof(buffer));
+		ExecuteCMD("echo >>/tmp/crontab.cron", buffer, sizeof(buffer));
         }
         if (TRUE == serviceStatus[2])
         {
                 ExecuteCMD("cat /home/pi/piServerProfile/sync.cron >>/tmp/crontab.cron", buffer, sizeof(buffer));
+		ExecuteCMD("echo >>/tmp/crontab.cron", buffer, sizeof(buffer));
         }
 
 	ExecuteCMD("crontab /tmp/crontab.cron", buffer, sizeof(buffer));
@@ -486,7 +522,7 @@ int GetServiceStatus()
 	int ret = 0;
         char buffer[1024] = { 0 };
 
-	ret = ExecuteCMD("crontab -l | grep piServerProfile/aircon.sh", buffer, sizeof(buffer));
+	ret = ExecuteCMD("crontab -l | grep '#PiServer Aircon'", buffer, sizeof(buffer));
         if (0 == ret && strlen(buffer) > 0)
         {
                 PrintScreen(11, MENU_ITEM_0, PRINT_NORMAL, GREEN, "ON");
@@ -500,7 +536,7 @@ int GetServiceStatus()
 	ret = 0;
 	memset((void *)buffer, (int)'\0', sizeof(buffer));
 
-        ret = ExecuteCMD("crontab -l | grep piServerProfile/tv.sh", buffer, sizeof(buffer));
+        ret = ExecuteCMD("crontab -l | grep '#PiServer TV'", buffer, sizeof(buffer));
         if (0 == ret && strlen(buffer) > 0)
         {
                 PrintScreen(11, MENU_ITEM_1, PRINT_NORMAL, GREEN, "ON");
@@ -514,7 +550,7 @@ int GetServiceStatus()
         ret = 0;
         memset((void *)buffer, (int)'\0', sizeof(buffer));
 
-        ret = ExecuteCMD("crontab -l | grep piServerProfile/sync.sh", buffer, sizeof(buffer));
+        ret = ExecuteCMD("crontab -l | grep '#PiServer Sync'", buffer, sizeof(buffer));
         if (0 == ret && strlen(buffer) > 0)
         {
                 PrintScreen(11, MENU_ITEM_2, PRINT_NORMAL, GREEN, "ON");

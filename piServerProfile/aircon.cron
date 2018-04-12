@@ -1,3 +1,6 @@
-# Aircon Forced-On
-0 1,4,7,10,13,16,19,22 * * * /home/pi/piServerProfile/aircon.sh
+#PiServer Aircon
 
+#0 2,5,17,20,23 * * 1,2,3,4,5 /home/pi/piServerProfile/aircon.sh
+#0 1,4,7,10,13,16,19,22 * * 6,7 /home/pi/piServerProfile/aircon.sh
+
+0 1,4,22 * * * /home/pi/piServerProfile/aircon.sh
